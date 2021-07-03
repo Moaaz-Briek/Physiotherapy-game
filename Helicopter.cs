@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-using System.IO.Ports;
 using System.Threading;
+using System.IO;
+using ArduinoBluetoothAPI;
+
 public class Helicopter : MonoBehaviour
 {
-    // arduino with helicopter
-    SerialPort serPort = new SerialPort("COM5", 9600);    
     private float amountToMove;
     // motion of the helicopter
     public float moveSpeed;
@@ -28,42 +28,74 @@ public class Helicopter : MonoBehaviour
     public bool flag2 = false; //down
     public Stack<bool> validate = new Stack<bool>();
     public int evalidate_exercise;
-    public int last_direction = 0;
-    public int result;
-    public int counter = 0;
+    public int Angle;
+    public int last_angle = 0;
+    public int Ratio_angle;
+    public bool remove_first_value_from_sensor = false;
+    public int number_of_flexion_and_extension_exercises = 0;
+    public int number_of_flexion_and_extension_exercises_come_from_doctor = 2;
+    public BluetoothHelper BTHelper;
 
     void Start()
-    {
-        serPort.Open();
-        serPort.ReadTimeout = 1;
+    {        
+        try
+        {            
+            BTHelper = BluetoothHelper.GetInstance("HC-05");         
+            BTHelper.OnConnected += OnConnected;            
+            BTHelper.OnConnectionFailed += OnconnFailed;
+            BTHelper.setTerminatorBasedStream("\n");
+            
+            if(BTHelper.isDevicePaired()) // if we have already paired with the device
+            {
+                BTHelper.Connect(); // if we manage to connect successfully             
+            }
+        }
+
+        catch (BluetoothHelper.BlueToothNotEnabledException ex) { Debug.Log("1"); }
+        catch (BluetoothHelper.BlueToothNotSupportedException ex){ Debug.Log("1"); }
+        catch (BluetoothHelper.BlueToothNotReadyException ex){ Debug.Log("1"); }
     }
 
+    void OnConnected()
+    {
+        BTHelper.StartListening(); //we start listening for incoming messages        
+    }
+
+    void OnconnFailed()
+    {
+
+    }
+
+    void OnDestroy()
+    {
+        if (BTHelper != null)
+        {
+            BTHelper.Disconnect();            
+        }
+    }
 
     void Update()
     {
         amountToMove = moveSpeed * Time.deltaTime;
-
-        if (serPort.IsOpen)
+        if (BTHelper != null)
         {
-            try
+            if (BTHelper.Available)
             {
-                Move_extension(serPort.ReadByte());
+                Angle = int.Parse(BTHelper.Read());
+                Debug.Log(Angle);
+                Move_extension(Angle);                
             }
-            catch (System.Exception)
-            {
-
-
-            }
-        }
-
-        if (transform.position.y >= 3.4 && flag1)
+        }                
+        
+        if (transform.position.y >= 3.1 && flag1)
         {
             validate.Push(Evalidate_up());
             flag2 = true;
             flag1 = false;
+
             Debug.Log("up");
-            counter += 1;
-            Debug.Log("counter : " + counter);
+            number_of_flexion_and_extension_exercises += 1;
+            //Debug.Log("number_of_flexion_and_extension_exercises : " + number_of_flexion_and_extension_exercises);
             Debug.Log("value : " + value);
         }
 
@@ -72,46 +104,53 @@ public class Helicopter : MonoBehaviour
             validate.Push(Evalidate_down());
             flag2 = false;
             flag1 = true;
+
             Debug.Log("down");
-            counter += 1;
-            Debug.Log("counter : " + counter);
+            number_of_flexion_and_extension_exercises += 1;
+            //Debug.Log("number_of_flexion_and_extension_exercises : " + number_of_flexion_and_extension_exercises);
             Debug.Log("value : " + value);
         }
 
-        if (counter == 2)
+        if (number_of_flexion_and_extension_exercises == number_of_flexion_and_extension_exercises_come_from_doctor)
         {
             if (Evalidate_exercise() >= 50)
             {
-                SceneManager.LoadScene("accepted exercise");
+                SceneManager.LoadScene("Accepted");
+                remove_first_value_from_sensor = false;
+                last_angle = 0;
             }
             else
             {
-                SceneManager.LoadScene("rejected exercise");
+                SceneManager.LoadScene("Rejected");
+                remove_first_value_from_sensor = false;
+                last_angle = 0;
             }
-            Debug.Log("evalidate_exercise : " + evalidate_exercise);
-        }
+        }    
     }
 
 
-    void Move_extension(int direction)
+    void Move_extension(int Angle)
     {
-        result = direction - last_direction;        
-        if (Math.Abs(result) > 0)
-        {            
-            if (result > 0)
+        Ratio_angle = last_angle - Angle;  
+        
+        if (Math.Abs(Ratio_angle) > 0 && Math.Abs(Ratio_angle) < 10  && remove_first_value_from_sensor)
+        {
+            if (Ratio_angle > 0)
             {
-                transform.Translate(Vector3.up * result * amountToMove, Space.World);
-                data.Push(result);
-                Debug.Log(result);
+                transform.Translate(Vector3.up * Ratio_angle * amountToMove, Space.World);
+                data.Push(Ratio_angle);
+                //Debug.Log(result);
             }
-            if(result < 0)
+            if (Ratio_angle < 0)
             {
-                transform.Translate(Vector3.down * -1 * result * amountToMove, Space.World);
-                data.Push(result);
-                Debug.Log(result);
+                int positive_ratio_angle = -1 * Ratio_angle;
+                transform.Translate(Vector3.down * positive_ratio_angle * amountToMove, Space.World);
+                data.Push(Ratio_angle);
+                //Debug.Log(result);
             }
         }
-        last_direction = direction;                        
+        last_angle = Angle;
+        remove_first_value_from_sensor = true;
     }
 
     public bool Evalidate_up()
@@ -121,9 +160,6 @@ public class Helicopter : MonoBehaviour
         {
             value += data.Pop();
         }
-
-        value += 20;
-
         if (value >= 80 && value <= 120)
         {
             return true;
@@ -141,10 +177,10 @@ public class Helicopter : MonoBehaviour
         {
             value += data.Pop();
         }
-        value -= 20;
         if (value <= -80 && value >= -120)
         {
-            return true;
+            return true;     
+            
         }
         else
         {
