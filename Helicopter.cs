@@ -11,29 +11,36 @@ using ArduinoBluetoothAPI;
 public class Helicopter : MonoBehaviour
 {
     private float amountToMove;
+    
     // motion of the helicopter
     public float moveSpeed;
     public Rigidbody2D rb;
     private Vector2 moveDirection;
+    
     //collect coins
     [SerializeField]
     public Text CoinCounter;
     public int CollidedCoinValue;
     public int TotalScore;
     public int LevelScore = 80;
-
-    public Stack<int> data = new Stack<int>();
-    public static int value;
-    public bool flag1 = true; //up
-    public bool flag2 = false; //down
-    public Stack<bool> validate = new Stack<bool>();
-    public int evalidate_exercise;
+    
+    //Angle    
     public int Angle;
     public int last_angle = 0;
     public int Ratio_angle;
     public bool remove_first_value_from_sensor = false;
-    public int number_of_flexion_and_extension_exercises = 0;
-    public int number_of_flexion_and_extension_exercises_come_from_doctor = 2;
+
+    //Validation
+    public Stack<int> data = new Stack<int>(); 
+    public static int value;
+    public bool flag1 = true; //Top flag
+    public bool flag2 = false; //Bottom flag    
+    public int flag_of_topDown = 0; //This flag indicates how many times the helicopter is Top or Down
+    public int Succeeded_Exercise = 0;
+    public int Required_Exercises = 2; //This value based on level number
+    
+
+    //Object from the Arduino Bluetooth API Plugin
     public BluetoothHelper BTHelper;
 
     void Start()
@@ -51,9 +58,9 @@ public class Helicopter : MonoBehaviour
             }
         }
 
-        catch (BluetoothHelper.BlueToothNotEnabledException ex) { Debug.Log("1"); }
-        catch (BluetoothHelper.BlueToothNotSupportedException ex){ Debug.Log("1"); }
-        catch (BluetoothHelper.BlueToothNotReadyException ex){ Debug.Log("1"); }
+        catch (BluetoothHelper.BlueToothNotEnabledException ex) {}
+        catch (BluetoothHelper.BlueToothNotSupportedException ex){}
+        catch (BluetoothHelper.BlueToothNotReadyException ex){}
     }
 
     void OnConnected()
@@ -81,39 +88,33 @@ public class Helicopter : MonoBehaviour
         {
             if (BTHelper.Available)
             {
-                Angle = int.Parse(BTHelper.Read());
-                Debug.Log(Angle);
+                Angle = int.Parse(BTHelper.Read());                
                 Move_extension(Angle);                
             }
-        }                
-        
-        if (transform.position.y >= 3.1 && flag1)
-        {
-            validate.Push(Evalidate_up());
-            flag2 = true;
-            flag1 = false;
-
-            Debug.Log("up");
-            number_of_flexion_and_extension_exercises += 1;
-            //Debug.Log("number_of_flexion_and_extension_exercises : " + number_of_flexion_and_extension_exercises);
-            Debug.Log("value : " + value);
         }
 
-        if (transform.position.y <= -1.9 && flag2)
+        if (flag_of_topDown < Required_Exercises)
         {
-            validate.Push(Evalidate_down());
-            flag2 = false;
-            flag1 = true;
+            if (transform.position.y >= 3.1 && flag1)
+            {
+                flag2 = true;
+                flag1 = false;
+                Evalidate_up();
+                flag_of_topDown += 1;
+                Debug.Log("Angle = 90");
+            }
 
-            Debug.Log("down");
-            number_of_flexion_and_extension_exercises += 1;
-            //Debug.Log("number_of_flexion_and_extension_exercises : " + number_of_flexion_and_extension_exercises);
-            Debug.Log("value : " + value);
+            if (transform.position.y <= -1.9 && flag2)
+            {
+                flag2 = false;
+                flag1 = true;
+                Evalidate_down();
+                flag_of_topDown += 1;
+                Debug.Log("Angle = 0");
+            }
         }
-
-        if (number_of_flexion_and_extension_exercises == number_of_flexion_and_extension_exercises_come_from_doctor)
-        {
-            if (Evalidate_exercise() >= 50)
+        else        
+        {   if (Required_Exercises - Succeeded_Exercise == 0)
             {
                 SceneManager.LoadScene("Accepted");
                 remove_first_value_from_sensor = false;
@@ -125,87 +126,63 @@ public class Helicopter : MonoBehaviour
                 remove_first_value_from_sensor = false;
                 last_angle = 0;
             }
-        }    
+        }
     }
 
 
     void Move_extension(int Angle)
     {
-        Ratio_angle = last_angle - Angle;  
-        
+        Ratio_angle = last_angle - Angle;        
         if (Math.Abs(Ratio_angle) > 0 && Math.Abs(Ratio_angle) < 10  && remove_first_value_from_sensor)
         {
             if (Ratio_angle > 0)
             {
                 transform.Translate(Vector3.up * Ratio_angle * amountToMove, Space.World);
-                data.Push(Ratio_angle);
-                //Debug.Log(result);
+                data.Push(Ratio_angle);                
             }
             if (Ratio_angle < 0)
             {
                 int positive_ratio_angle = -1 * Ratio_angle;
                 transform.Translate(Vector3.down * positive_ratio_angle * amountToMove, Space.World);
-                data.Push(Ratio_angle);
-                //Debug.Log(result);
+                data.Push(Ratio_angle);                
             }
         }
+
         last_angle = Angle;
         remove_first_value_from_sensor = true;
     }
 
-    public bool Evalidate_up()
+
+    public void Evalidate_up()
     {
         value = 0;
         while (!(data.Count == 0))
         {
-            value += data.Pop();
+            value += data.Pop();            
         }
         if (value >= 80 && value <= 120)
         {
-            return true;
+            Succeeded_Exercise += 1;            
         }
-        else
-        {
-            return false;
-        }
+        else{}
+        Debug.Log(value);
     }
 
-    public bool Evalidate_down()
+    public void Evalidate_down()
     {
         value = 0;
         while (!(data.Count == 0))
         {
-            value += data.Pop();
+            value += data.Pop();            
         }
         if (value <= -80 && value >= -120)
         {
-            return true;     
-            
+            Succeeded_Exercise += 1;
         }
-        else
-        {
-            return false;
-        }
+        else{}
+        Debug.Log(value);
     }
-
-    public int Evalidate_exercise()
-    {
-        evalidate_exercise = 0;
-        while (!(validate.Count == 0))
-        {
-            if (validate.Pop())
-            {
-                evalidate_exercise += 25;
-            }
-            else
-            {
-                evalidate_exercise += 0;
-            }
-        }
-        return evalidate_exercise;
-
-    }
-
+    
     void OnTriggerEnter2D(Collider2D collision)
     {
         CollidedCoinValue = collision.gameObject.GetComponent<Coin>().coinValue;
