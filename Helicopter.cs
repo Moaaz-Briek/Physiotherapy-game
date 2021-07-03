@@ -101,7 +101,7 @@ public class Helicopter : MonoBehaviour
                 flag1 = false;
                 Evalidate_up();
                 flag_of_topDown += 1;
-                Debug.Log("Angle = 90");
+                //Debug.Log("Angle = 90");
             }
 
             if (transform.position.y <= -1.9 && flag2)
@@ -110,7 +110,7 @@ public class Helicopter : MonoBehaviour
                 flag1 = true;
                 Evalidate_down();
                 flag_of_topDown += 1;
-                Debug.Log("Angle = 0");
+                //Debug.Log("Angle = 0");
             }
         }
         else        
@@ -135,17 +135,11 @@ public class Helicopter : MonoBehaviour
         Ratio_angle = last_angle - Angle;        
         if (Math.Abs(Ratio_angle) > 0 && Math.Abs(Ratio_angle) < 10  && remove_first_value_from_sensor)
         {
-            if (Ratio_angle > 0)
-            {
-                transform.Translate(Vector3.up * Ratio_angle * amountToMove, Space.World);
-                data.Push(Ratio_angle);                
-            }
-            if (Ratio_angle < 0)
-            {
-                int positive_ratio_angle = -1 * Ratio_angle;
-                transform.Translate(Vector3.down * positive_ratio_angle * amountToMove, Space.World);
-                data.Push(Ratio_angle);                
-            }
+            Vector3 newPosition = transform.position; // We store the current position            
+            float y = (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle) ) - Convert.ToSingle(2.0);            
+            newPosition.y = y;
+            transform.position = newPosition; // We pass it back            
+            data.Push(Ratio_angle);                         
         }
 
         last_angle = Angle;
@@ -165,7 +159,7 @@ public class Helicopter : MonoBehaviour
             Succeeded_Exercise += 1;            
         }
         else{}
-        Debug.Log(value);
+        //Debug.Log(value);
     }
 
     public void Evalidate_down()
@@ -180,7 +174,7 @@ public class Helicopter : MonoBehaviour
             Succeeded_Exercise += 1;
         }
         else{}
-        Debug.Log(value);
+        //Debug.Log(value);
     }
     
     void OnTriggerEnter2D(Collider2D collision)
