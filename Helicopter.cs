@@ -28,7 +28,7 @@ public class Helicopter : MonoBehaviour
     public int Angle;
     public int last_angle = 0;
     public int Ratio_angle;
-    public bool remove_first_value_from_sensor = false;
+    public bool remove_first_value_from_sensor = false;    
 
     //Validation
     public Stack<int> data = new Stack<int>(); 
@@ -37,9 +37,12 @@ public class Helicopter : MonoBehaviour
     public bool flag2 = false; //Bottom flag    
     public int flag_of_topDown = 0; //This flag indicates how many times the helicopter is Top or Down
     public int Succeeded_Exercise = 0;
+    public float y_flag_position = 0;
+
+    //parameters from database
+    public int Angle_of_exercise = 45; //This angle is set by doctor
     public int Required_Exercises = 2; //This value based on level number
     
-
     //Object from the Arduino Bluetooth API Plugin
     public BluetoothHelper BTHelper;
 
@@ -61,7 +64,9 @@ public class Helicopter : MonoBehaviour
         catch (BluetoothHelper.BlueToothNotEnabledException ex) {}
         catch (BluetoothHelper.BlueToothNotSupportedException ex){}
         catch (BluetoothHelper.BlueToothNotReadyException ex){}
-    }
+        y_flag_position = (Convert.ToSingle(0.061) * Convert.ToSingle(Angle_of_exercise) - Convert.ToSingle(2.0));
+        Debug.Log("w");        
+}
 
     void OnConnected()
     {
@@ -80,10 +85,10 @@ public class Helicopter : MonoBehaviour
             BTHelper.Disconnect();            
         }
     }
-
+    
     void Update()
-    {
-        amountToMove = moveSpeed * Time.deltaTime;
+    {        
+        //amountToMove = moveSpeed * Time.deltaTime;
         if (BTHelper != null)
         {
             if (BTHelper.Available)
@@ -94,36 +99,35 @@ public class Helicopter : MonoBehaviour
         }
 
         if (flag_of_topDown < Required_Exercises)
-        {
-            if (transform.position.y >= 3.1 && flag1)
-            {
+        {            
+            if (transform.position.y >= y_flag_position && flag1) // 0.745 == 45 degree ,, 
+            {                
                 flag2 = true;
                 flag1 = false;
-                Evalidate_up();
+                Evalidate();
                 flag_of_topDown += 1;
-                //Debug.Log("Angle = 90");
+                Debug.Log("Up");
+                
             }
 
             if (transform.position.y <= -1.9 && flag2)
-            {
+            {            
                 flag2 = false;
                 flag1 = true;
-                Evalidate_down();
+                Evalidate();
                 flag_of_topDown += 1;
-                //Debug.Log("Angle = 0");
+                
             }
         }
         else        
         {   if (Required_Exercises - Succeeded_Exercise == 0)
             {
                 SceneManager.LoadScene("Accepted");
-                remove_first_value_from_sensor = false;
                 last_angle = 0;
             }
             else
             {
                 SceneManager.LoadScene("Rejected");
-                remove_first_value_from_sensor = false;
                 last_angle = 0;
             }
         }
@@ -132,47 +136,31 @@ public class Helicopter : MonoBehaviour
 
     void Move_extension(int Angle)
     {
-        if (Angle <= 89)
+        if (Angle <= 90 && remove_first_value_from_sensor)
         {
-            Vector3 newPosition = transform.position; // We store the current position            
-            float y = (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle)) - Convert.ToSingle(2.0);
-            newPosition.y = y;
-            transform.position = newPosition; // We pass it back                        
-            data.Push(last_angle - Angle);
+            transform.position = new Vector3(transform.position.x, (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle)) - Convert.ToSingle(2.0), 0);            
+            data.Push(Math.Abs(last_angle - Angle));
+            Debug.Log(Angle);
         }
-        else { }
+        else {}
         last_angle = Angle;
+        remove_first_value_from_sensor = true;
     }
 
 
-    public void Evalidate_up()
+    public void Evalidate()
     {
         value = 0;
         while (!(data.Count == 0))
         {
             value += data.Pop();            
         }
-        if (value >= 80 && value <= 120)
+        if (value >= (Angle_of_exercise - 10) && value <= (Angle_of_exercise + 10)) //tolerance
         {
             Succeeded_Exercise += 1;            
         }
         else{}
-        //Debug.Log(value);
-    }
-
-    public void Evalidate_down()
-    {
-        value = 0;
-        while (!(data.Count == 0))
-        {
-            value += data.Pop();            
-        }
-        if (value <= -80 && value >= -120)
-        {
-            Succeeded_Exercise += 1;
-        }
-        else{}
-        //Debug.Log(value);
+        Debug.Log("Evalidate : " + value);
     }
     
     void OnTriggerEnter2D(Collider2D collision)
