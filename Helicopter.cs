@@ -132,18 +132,16 @@ public class Helicopter : MonoBehaviour
 
     void Move_extension(int Angle)
     {
-        Ratio_angle = last_angle - Angle;        
-        if (Math.Abs(Ratio_angle) > 0 && Math.Abs(Ratio_angle) < 10  && remove_first_value_from_sensor)
+        if (Angle <= 89)
         {
             Vector3 newPosition = transform.position; // We store the current position            
-            float y = (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle) ) - Convert.ToSingle(2.0);            
+            float y = (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle)) - Convert.ToSingle(2.0);
             newPosition.y = y;
-            transform.position = newPosition; // We pass it back            
-            data.Push(Ratio_angle);                         
+            transform.position = newPosition; // We pass it back                        
+            data.Push(last_angle - Angle);
         }
-
+        else { }
         last_angle = Angle;
-        remove_first_value_from_sensor = true;
     }
 
 
