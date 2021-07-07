@@ -32,7 +32,7 @@ public class Helicopter : MonoBehaviour
 
     //Validation
     public Stack<int> data = new Stack<int>(); 
-    public static int value;
+    public int value;
     public bool flag1 = true; //Top flag
     public bool flag2 = false; //Bottom flag    
     public int flag_of_topDown = 0; //This flag indicates how many times the helicopter is Top or Down
@@ -40,10 +40,16 @@ public class Helicopter : MonoBehaviour
     public float y_flag_position = 0;
 
     //parameters from database
-    public int Angle_of_exercise = 45; //This angle is set by doctor
+    public int Angle_of_exercise = 90; //This angle is set by doctor
     public int Required_Exercises = 2; //This value based on level number
-    
-    //Object from the Arduino Bluetooth API Plugin
+
+    //parameters go to database
+    public LinkedList<int> feel_pain_angle = new LinkedList<int>();
+    public bool Result_of_exercise;
+    public LinkedList<int> Flexion_Angle = new LinkedList<int>();
+    public LinkedList<int> Extension_Angle = new LinkedList<int>();    
+
+    //Object from the ArduinoBluetoothAPI Plugin
     public BluetoothHelper BTHelper;
 
     void Start()
@@ -85,7 +91,12 @@ public class Helicopter : MonoBehaviour
             BTHelper.Disconnect();            
         }
     }
-    
+
+    public void FeelPain()
+    {
+        feel_pain_angle.AddLast(Angle);
+    }
+
     void Update()
     {        
         //amountToMove = moveSpeed * Time.deltaTime;
@@ -100,11 +111,11 @@ public class Helicopter : MonoBehaviour
 
         if (flag_of_topDown < Required_Exercises)
         {            
-            if (transform.position.y >= y_flag_position && flag1) // 0.745 == 45 degree ,, 
+            if (transform.position.y >= y_flag_position && flag1) // 0.745 == 45 degree ,, 3.5 == 90 degree.
             {                
                 flag2 = true;
                 flag1 = false;
-                Evalidate();
+                Flexion_Angle.AddLast(Evalidate());
                 flag_of_topDown += 1;
                 Debug.Log("Up");
                 
@@ -114,7 +125,7 @@ public class Helicopter : MonoBehaviour
             {            
                 flag2 = false;
                 flag1 = true;
-                Evalidate();
+                Extension_Angle.AddLast(Evalidate());
                 flag_of_topDown += 1;
                 
             }
@@ -123,12 +134,34 @@ public class Helicopter : MonoBehaviour
         {   if (Required_Exercises - Succeeded_Exercise == 0)
             {
                 SceneManager.LoadScene("Accepted");
-                last_angle = 0;
+                Result_of_exercise = true;
             }
             else
             {
                 SceneManager.LoadScene("Rejected");
-                last_angle = 0;
+                Result_of_exercise = false;
+            }
+
+            last_angle = 0;
+            remove_first_value_from_sensor = false;
+            value = 0;
+
+            Debug.Log("Angles The patient feel pain at : ");
+            foreach (int angle in feel_pain_angle)
+            {
+                Debug.Log(angle + "\t");
+            }
+            
+            Debug.Log("Flexion Angles : ");
+            foreach (int angle in Flexion_Angle)
+            {
+                Debug.Log(angle + "\t");
+            }
+            
+            Debug.Log("Extension Angles : ");
+            foreach (int angle in Extension_Angle)
+            {
+                Debug.Log(angle + "\t");
             }
         }
     }
@@ -136,9 +169,10 @@ public class Helicopter : MonoBehaviour
 
     void Move_extension(int Angle)
     {
+        float y = (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle)) - Convert.ToSingle(2.0); //This equation is the scale of the helicopter movemenet, 0.061 = ((Top - base) / 90)  
         if (Angle <= 90 && remove_first_value_from_sensor)
         {
-            transform.position = new Vector3(transform.position.x, (Convert.ToSingle(0.061) * Convert.ToSingle(90 - Angle)) - Convert.ToSingle(2.0), 0);            
+            transform.position = new Vector3(transform.position.x, y, 0);
             data.Push(Math.Abs(last_angle - Angle));
             Debug.Log(Angle);
         }
@@ -148,7 +182,7 @@ public class Helicopter : MonoBehaviour
     }
 
 
-    public void Evalidate()
+    public int Evalidate()
     {
         value = 0;
         while (!(data.Count == 0))
@@ -160,7 +194,7 @@ public class Helicopter : MonoBehaviour
             Succeeded_Exercise += 1;            
         }
         else{}
-        Debug.Log("Evalidate : " + value);
+        return value;
     }
     
     void OnTriggerEnter2D(Collider2D collision)
